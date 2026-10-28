@@ -149,8 +149,13 @@ def static_gates(r: Result, args) -> None:
           "无 >5MB 文件" if not big else "; ".join(f"{p.relative_to(ROOT)} {s // 1024 // 1024}MB" for p, s in big))
 
     # 2 media-gate（顺带拦软链接：ln -s ../models models 能绕过 models/ 规则）
+    def is_media(p: Path) -> bool:
+        if p.suffix.lower() in MEDIA_EXT:
+            return True
+        return p.name.endswith((".model3.json", ".motion3.json", ".physics3.json"))
+
     media = [p.relative_to(ROOT).as_posix() for p in files
-             if p.suffix.lower() in MEDIA_EXT and p.relative_to(ROOT).as_posix() not in MEDIA_ALLOWLIST]
+             if is_media(p) and p.relative_to(ROOT).as_posix() not in MEDIA_ALLOWLIST]
     links = [p.relative_to(ROOT).as_posix() for p in files if p.is_symlink()]
     if links:
         media += [f"{x}(软链接)" for x in links]

@@ -97,7 +97,7 @@ jobs:
           tail -50 /tmp/digital-me.log
           exit 1
 
-      - name: 运行时闸门 + 延迟
+      - name: 运行时闸门 + 延迟（M1 首字 / M2 端到端）
         env:
           PII_EXTRA_TERMS: ${{ secrets.PII_EXTRA_TERMS }}
         run: |
@@ -107,12 +107,32 @@ jobs:
           python3 - <<'PY'
           import json
           s = json.load(open("/tmp/turn20.json"))["summary"]
-          p95 = s["ttft_p95"]
-          print(f"ttft_p95 = {p95} ms | date_leak = {s['date_leak_count']} | repeat = {s['repeat_count']} | turn20_recall = {s['turn20_recall']}")
-          assert p95 <= 1000, f"首字 P95 {p95} ms 超过 1000 ms 门槛"
+          print(f"ttft_p95 = {s['ttft_p95']} ms | date_leak = {s['date_leak_count']} | "
+                f"repeat = {s['repeat_count']} | turn20_recall = {s['turn20_recall']}")
+          # M1：首字 P95 ≤ 1000 ms（实测 255）
+          assert s["ttft_p95"] <= 1000, f"M1 首字 P95 {s['ttft_p95']} ms 超过 1000 ms"
           assert s["date_leak_count"] <= 2, "时间注入泄漏超限"
           assert s["repeat_count"] <= 2, "跨轮复读超限"
           assert s["turn20_recall"], "第 20 轮未召回第 1 轮信息（R2）"
+
+          # M2：端到端首音 P95 ≤ 3000 ms（owner 2026-10-29 定）。
+          # 注意：e2e 由浏览器上报（POST /api/latency），纯 API 的 turn20 不会产生它；
+          # 有日志就卡，没有就跳过——绝不造数据。
+          import os
+          lp = "app/logs/latency.jsonl"
+          if not os.path.exists(lp):
+              print("e2e_audio_p95 = SKIP（本次没有浏览器上报的 latency.jsonl，M2 需人工跑一次 UI 会话）")
+          else:
+              rows = [json.loads(l) for l in open(lp) if l.strip()]
+              e2e = sorted(r["e2e_audio_ms"] for r in rows[-20:] if r.get("e2e_audio_ms") is not None)
+              if not e2e:
+                  print("e2e_audio_p95 = SKIP（latency.jsonl 存在但没有 e2e_audio_ms 字段）")
+              else:
+                  k = (len(e2e) - 1) * 0.95
+                  f, c = int(k), min(int(k) + 1, len(e2e) - 1)
+                  p95 = round(e2e[f] + (e2e[c] - e2e[f]) * (k - f), 1)
+                  print(f"e2e_audio_p95 = {p95} ms（{len(e2e)} 轮）")
+                  assert p95 <= 3000, f"M2 端到端首音 P95 {p95} ms 超过 3000 ms"
           PY
 
       - name: 清理
