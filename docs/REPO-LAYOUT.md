@@ -58,6 +58,21 @@ python3 scripts/check_repo.py --live   # 追加：健康检查 / 思维链泄漏
 | `thinking-leak` | 思维链泄漏 / 空回复 | 可见文本 0 个 think 标签、非空、有 `done` |
 | `latency-smoke` | 服务不可用 | `/api/health` 200 且 `ok=true` |
 
+## 契约层（需要私有数据，公开仓只放脚本）
+
+`scripts/release_check.py --private-root ~/Desktop/我的数字人`：
+
+| ID | 拦什么 | 判据 |
+|---|---|---|
+| `manifest-verify` | 验收卡被改、模型换了、参数对不上 | 卡 sha256+字节与 manifest 一致；模型 id/blob 一致；`manifest.llm` 六项 == `app/config.yaml` 实际值 |
+| `snapshot-head` | 报告引用了滚动日志 | 每份 `latency-report-*.md` 头里 6 行快照齐全，数据源是**归档文件**且存在 |
+| `m2-acceptance` | 拿旧数据冒充验收 | 最新归档 20 轮：端到端 P95 ≤3000 ms **且 20/20 真音色**（18/20 只能标 18/20） |
+| `guard-smoke` | 注入攻击穿透到模型 | `done.guarded` 存在、`ttft_ms=0`、只回 1 句拒绝话术 |
+| `guard-lang` | 中文里夹英文、技术题被误伤 | 闲聊命中率 ≤15%，技术类 0 误伤（调私有仓 `lang_guard_eval2.py`，不另写口径） |
+
+`scripts/assert_latency.py` 负责把 20 轮回归 + 浏览器埋点日志变成 M1/M2 判据；
+**e2e 只来自浏览器上报，没有日志就 SKIP，绝不填默认值**。
+
 **私有词表怎么来**：真实姓名/单位绝不写进本仓的模式里。CI 用 repository secret `PII_EXTRA_TERMS`（逗号分隔）注入；
 本地用 `python3 scripts/check_repo.py --extra-file ~/digital-me-private/pii-terms.txt`。
 
