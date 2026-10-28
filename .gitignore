@@ -1,5 +1,7 @@
 # 模型与权重——永远不进仓库
 models/
+models
+# 指向仓库外的软链接（ln -s ../models models 时，只有上面那行不生效）
 *.gguf
 *.pth
 *.ckpt

@@ -1,0 +1,122 @@
+name: ci
+
+# 发布闸门。所有 PR / push 到 main 必过 static 作业；
+# live 作业需要 ollama + 本机模型，只在自托管 runner 上手动触发。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_live:
+        description: "同时跑运行时闸门（需自托管 runner + ollama）"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: 静态闸门（泄露 / 大文件 / 语法 / 参数接线）
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装闸门依赖
+        run: pip install --quiet pyyaml
+
+      - name: 跑闸门
+        env:
+          # 真实姓名/单位等私有词不进仓库，走 repository secret
+          PII_EXTRA_TERMS: ${{ secrets.PII_EXTRA_TERMS }}
+        run: python3 scripts/check_repo.py
+
+      - name: 大文件与历史检查（git 层）
+        run: |
+          set -euo pipefail
+          # 单个 blob >5MB 一律拦截（LFS 例外见 .gitattributes）
+          if git rev-list --objects --all \
+             | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' \
+             | awk '$1=="blob" && $3>5000000 {print $3" "$4}' | grep -q .; then
+            echo "::error::历史中存在 >5MB 的 blob，改用 Release 附件 / LFS"
+            git rev-list --objects --all \
+             | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' \
+             | awk '$1=="blob" && $3>5000000 {print $3" "$4}'
+            exit 1
+          fi
+          # 历史里出现模型/音频后缀直接失败
+          if git log --all --name-only --pretty=format: \
+             | grep -Ei '\.(gguf|pth|ckpt|onnx|safetensors|wav|m4a|mp3)$' | grep -q .; then
+            echo "::error::历史中出现模型或音频文件"
+            git log --all --name-only --pretty=format: \
+             | grep -Ei '\.(gguf|pth|ckpt|onnx|safetensors|wav|m4a|mp3)$' | sort -u
+            exit 1
+          fi
+          echo "历史干净"
+
+  live:
+    name: 运行时闸门（健康 / 思维链泄漏 / 延迟）
+    if: github.event_name == 'workflow_dispatch' && inputs.run_live
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 准备配置
+        run: |
+          set -euo pipefail
+          cp app/config.example.yaml app/config.yaml
+          python3 - <<'PY'
+          import pathlib, re
+          p = pathlib.Path("app/config.yaml")
+          s = p.read_text()
+          s = s.replace("../config/character.yaml", "../config/character.example.yaml")
+          p.write_text(s)
+          PY
+
+      - name: 启动服务并等健康检查
+        run: |
+          set -euo pipefail
+          nohup python3 app/server.py > /tmp/digital-me.log 2>&1 &
+          echo $! > /tmp/digital-me.pid
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' http://127.0.0.1:8765/api/health || true)
+            if [ "$code" = "200" ]; then echo "health 200（第 ${i} 次）"; cat /tmp/health.json; exit 0; fi
+            sleep 2
+          done
+          echo "::error::60 次轮询仍未 healthy（503=服务活着但 ollama/模型没就绪）"
+          tail -50 /tmp/digital-me.log
+          exit 1
+
+      - name: 运行时闸门 + 延迟
+        env:
+          PII_EXTRA_TERMS: ${{ secrets.PII_EXTRA_TERMS }}
+        run: |
+          set -euo pipefail
+          python3 scripts/check_repo.py --live
+          python3 app/scripts/turn20.py --json /tmp/turn20.json
+          python3 - <<'PY'
+          import json
+          s = json.load(open("/tmp/turn20.json"))["summary"]
+          p95 = s["ttft_p95"]
+          print(f"ttft_p95 = {p95} ms | date_leak = {s['date_leak_count']} | repeat = {s['repeat_count']} | turn20_recall = {s['turn20_recall']}")
+          assert p95 <= 1000, f"首字 P95 {p95} ms 超过 1000 ms 门槛"
+          assert s["date_leak_count"] <= 2, "时间注入泄漏超限"
+          assert s["repeat_count"] <= 2, "跨轮复读超限"
+          assert s["turn20_recall"], "第 20 轮未召回第 1 轮信息（R2）"
+          PY
+
+      - name: 清理
+        if: always()
+        run: |
+          if [ -f /tmp/digital-me.pid ]; then kill "$(cat /tmp/digital-me.pid)" 2>/dev/null || true; fi
+          rm -f app/config.yaml

@@ -16,9 +16,14 @@ for c in python3.12 python3.11 python3.10 python3; do
   fi
 done
 if [ -z "$PY" ]; then
-  echo "缺少 Python 3.10+。"
-  echo "  macOS: brew install python@3.12   或从 python.org 下载"
-  echo "  Linux: sudo apt install python3.12"
+  echo "缺少 Python 3.10+。三条路，任选一条："
+  echo "  1) 官方安装包（无需 Homebrew）: https://www.python.org/downloads/macos/"
+  echo "  2) uv（会自动带回一个 Python）: curl -LsSf https://astral.sh/uv/install.sh | sh"
+  if command -v brew >/dev/null 2>&1; then
+    echo "  3) Homebrew: brew install python@3.12"
+  else
+    echo "  3) 本机没装 Homebrew——别照网上教程硬装，上面两条就够了"
+  fi
   exit 1
 fi
 echo "  Python: $($PY -V)  ($PY)"

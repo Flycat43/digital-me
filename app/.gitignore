@@ -1,0 +1,12 @@
+# 运行时产物与私有配置不进公开仓
+config.yaml
+logs/
+bin/
+*.jsonl
+shots/*.mov
+
+# Python / 系统
+__pycache__/
+*.pyc
+.DS_Store
+
