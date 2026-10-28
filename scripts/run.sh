@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# 启动前预检 + 拉起本地推理服务
+# 一条命令跑通：预检 → 确保 ollama 里有模型 → 拉起桌宠服务端（app/server.py）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 fail() { echo "✗ $1"; exit 1; }
 ok()   { echo "✓ $1"; }
 
+PORT="${PET_PORT:-8765}"
+
 echo "== digital-me 启动预检 =="
 
-# 模型
+# 1. 模型
 MODEL="models/Qwen3-4B-Q4_K_M.gguf"
 if [ ! -f "$MODEL" ]; then
   fail "缺少模型。先跑 python3 scripts/fetch_models.py"
@@ -19,50 +21,48 @@ if [ "$SIZE" -lt 2000000000 ]; then
 fi
 ok "模型 $(($SIZE/1024/1024)) MB"
 
-# 虚拟环境
+# 2. 虚拟环境
 if [ ! -x .venv/bin/python ]; then
   fail "缺少 .venv，先跑 ./install.sh"
 fi
-ok "Python 环境就绪"
+PY=".venv/bin/python"
+ok "Python 环境就绪 ($($PY -V 2>&1))"
 
-# 配置
-if [ ! -f config/character.yaml ]; then
-  echo "!  没有 config/character.yaml，将使用示例人格"
-  echo "   cp config/character.example.yaml config/character.yaml"
+# 3. 服务端配置（真配置不进仓，首次从模板生成）
+if [ ! -f app/config.yaml ]; then
+  cp app/config.example.yaml app/config.yaml
+  echo "!  已从 app/config.example.yaml 生成 app/config.yaml（占位符版本）"
+  echo "   换成自己的音色：改 tts.gpt_sovits.ref_audio；换成自己的人格：改 persona.character_card"
 fi
+ok "配置 app/config.yaml"
 
-# 推理引擎：llama-server 优先（HTTP 接口），否则用 ollama
-if command -v llama-server >/dev/null 2>&1; then
-  ok "llama-server 已安装"
-  echo
-  echo "启动 llama-server（Ctrl+C 停止）..."
-  exec llama-server -m "$MODEL" -c 4096 --port 8080 --host 127.0.0.1
-elif [ -x third_party/llama.cpp/build/bin/llama-server ]; then
-  ok "使用 third_party 里的 llama-server"
-  echo
-  exec third_party/llama.cpp/build/bin/llama-server -m "$MODEL" -c 4096 --port 8080 --host 127.0.0.1
-elif command -v ollama >/dev/null 2>&1; then
-  ok "检测到 ollama（内核同样是 llama.cpp）"
+# 4. 推理引擎：ollama 优先（本机没有 cmake，llama.cpp 不走源码编译）
+if command -v ollama >/dev/null 2>&1; then
   NAME="digital-me-local"
-  MODEL_ABS="$(cd "$(dirname "$MODEL")" && pwd)/$(basename "$MODEL")"
-  if ! ollama list | grep -q "^$NAME"; then
+  if ! ollama list | grep -q "^${NAME}"; then
     echo "  首次导入模型（约 2.4 GB，只做一次）..."
-    printf 'FROM %s\n' "$MODEL_ABS" > models/Modelfile
+    printf 'FROM %s\n' "$(cd "$(dirname "$MODEL")" && pwd)/$(basename "$MODEL")" > models/Modelfile
     ollama create "$NAME" -f models/Modelfile
   fi
-  ok "模型已导入为 $NAME"
-  echo
-  echo "ollama 已在后台提供 HTTP 接口：http://127.0.0.1:11434"
-  echo "直接对话： ollama run $NAME"
-  echo "对话时记得在 prompt 末尾加 /no_think，否则 Qwen3 会先生成几百 token 思维链"
-  exit 0
+  ok "ollama 模型就绪：$NAME"
+elif command -v llama-server >/dev/null 2>&1; then
+  echo "!  检测到 llama-server，但它不提供 /api/chat 的 think 参数"
+  echo "   请把 app/config.yaml 的 llm.host 改成 http://127.0.0.1:8080、llm.api_style 改成 openai"
+  echo "   （openai 分支会带 reasoning_effort=none，否则整段跑思维链、可见文本为空）"
+  echo "   然后另开一个终端：llama-server -m $MODEL -c 4096 --port 8080 --host 127.0.0.1"
 else
   echo
-  echo "没找到推理引擎。三选一："
+  echo "没找到推理引擎。两条路："
   echo "  ollama（最省事）: https://ollama.com/download"
-  echo "  Homebrew:         brew install llama.cpp"
-  echo "  源码编译（需要 cmake）:"
-  echo "    git clone https://github.com/ggml-org/llama.cpp third_party/llama.cpp"
-  echo "    cd third_party/llama.cpp && cmake -B build && cmake --build build -j"
+  echo "  源码编译 llama.cpp（需要 cmake）: 见 docs/ARCHITECTURE.md"
   exit 1
 fi
+
+# 5. 起服务
+echo
+echo "== 启动桌宠服务端 =="
+echo "  http://127.0.0.1:${PORT}      健康检查 /api/health"
+echo "  原生窗口（macOS）：cd app && ./run_mac.sh"
+echo "  Ctrl+C 停止"
+echo
+exec env PET_PORT="$PORT" "$PY" app/server.py --port "$PORT"

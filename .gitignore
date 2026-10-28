@@ -1,11 +1,21 @@
 # 模型与权重——永远不进仓库
 models/
+models
+# 指向仓库外的软链接（ln -s ../models models 时，只有上面那行不生效）
 *.gguf
 *.pth
 *.ckpt
 *.onnx
 *.safetensors
 *.bin
+
+# Live2D 模型（许可见 docs/LIVE2D.md：不 vendor，安装时下载）
+assets/live2d/*
+!assets/live2d/.gitkeep
+*.moc3
+*.model3.json
+*.motion3.json
+*.physics3.json
 
 # 个人音色与语料
 voice/

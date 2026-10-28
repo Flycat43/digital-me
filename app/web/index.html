@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>颜小二 · digital-me</title>
+<link rel="stylesheet" href="/web/pet.css" />
+</head>
+<body>
+<div id="stage">
+
+  <!-- ============ 角色（SVG 伪骨骼：呼吸 / 眨眼 / 口型 / 倾斜） ============ -->
+  <div id="pet" class="state-idle">
+    <svg id="avatar" viewBox="0 0 300 330" width="300" height="330" aria-label="颜小二">
+      <defs>
+        <radialGradient id="ringGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="60%" stop-color="#FFB86B" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#FFB86B" stop-opacity=".55"/>
+        </radialGradient>
+        <linearGradient id="hoodie" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#3C5A80"/>
+          <stop offset="100%" stop-color="#27405E"/>
+        </linearGradient>
+      </defs>
+
+      <ellipse id="ring" cx="150" cy="165" r="128" fill="url(#ringGrad)"/>
+      <ellipse cx="150" cy="312" rx="74" ry="9" fill="#000" opacity=".18"/>
+
+      <g id="breathe">
+        <!-- 身体 -->
+        <path d="M150 236 c-46 0 -78 26 -86 60 c-2 9 4 14 12 14 h148 c8 0 14 -5 12 -14 c-8 -34 -40 -60 -86 -60 z" fill="url(#hoodie)"/>
+        <path d="M150 236 c-14 0 -24 10 -24 20 c0 12 10 20 24 20 c14 0 24 -8 24 -20 c0 -10 -10 -20 -24 -20 z" fill="#1F344C"/>
+        <rect x="138" y="212" width="24" height="26" rx="10" fill="#F2C6A6"/>
+
+        <g id="head">
+          <!-- 耳朵 -->
+          <ellipse cx="72" cy="158" rx="11" ry="15" fill="#F2C6A6"/>
+          <ellipse cx="228" cy="158" rx="11" ry="15" fill="#F2C6A6"/>
+          <!-- 脸 -->
+          <ellipse cx="150" cy="150" rx="78" ry="84" fill="#FFD9BE"/>
+          <!-- 头发 -->
+          <path d="M150 62 c-46 0 -80 28 -80 74 c0 12 2 22 6 30 c2 -22 10 -34 22 -42 c16 10 40 14 52 14 c18 0 38 -6 50 -14 c12 8 20 20 22 42 c4 -8 6 -18 6 -30 c0 -46 -32 -74 -78 -74 z" fill="#242832"/>
+          <path d="M104 96 c14 -14 30 -20 46 -20 c18 0 34 6 46 18 c-14 -4 -28 -6 -46 -6 c-18 0 -32 2 -46 8 z" fill="#31374a" opacity=".9"/>
+          <!-- 眉毛 -->
+          <path id="browL" d="M112 128 q14 -8 28 -2" stroke="#2B2F3A" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <path id="browR" d="M160 126 q14 -6 28 2" stroke="#2B2F3A" stroke-width="5" fill="none" stroke-linecap="round"/>
+          <!-- 眼睛 -->
+          <ellipse id="eyeL" cx="126" cy="152" rx="9" ry="11" fill="#20242E"/>
+          <ellipse id="eyeR" cx="174" cy="152" rx="9" ry="11" fill="#20242E"/>
+          <circle cx="129" cy="148" r="3" fill="#fff" opacity=".95"/>
+          <circle cx="177" cy="148" r="3" fill="#fff" opacity=".95"/>
+          <!-- 腮红 -->
+          <ellipse cx="106" cy="176" rx="13" ry="7" fill="#FF9E8A" opacity=".35"/>
+          <ellipse cx="194" cy="176" rx="13" ry="7" fill="#FF9E8A" opacity=".35"/>
+          <!-- 嘴 -->
+          <path id="mouth" d="M138 190 q12 8 24 0" stroke="#B4543F" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+        </g>
+      </g>
+    </svg>
+
+    <div id="badge"><span id="badgeDot"></span><span id="badgeText">待机</span></div>
+  </div>
+
+  <!-- ============ 对话面板 ============ -->
+  <section id="panel">
+    <header id="panelHead">
+      <div class="who"><b id="petName">颜小二</b><i id="sub">本地 · Qwen3-4B</i></div>
+      <div class="acts">
+        <button id="btnReset" title="清空上下文">↺</button>
+        <button id="btnMin" title="收起">–</button>
+      </div>
+    </header>
+
+    <div id="log" aria-live="polite">
+      <div class="hint">说句话试试。语音输入未接入（缺识别模型），先跑文字 + 出声。</div>
+    </div>
+
+    <form id="composer" autocomplete="off">
+      <button type="button" id="btnMic" disabled title="ASR 未接入">🎙</button>
+      <input id="input" placeholder="跟小二说点什么…" maxlength="500" spellcheck="false" autocapitalize="off" />
+      <button type="submit" id="btnSend">发送</button>
+    </form>
+    <div id="meta"><span id="stat">—</span><span id="ver"></span></div>
+  </section>
+</div>
+<script src="/web/app.js"></script>
+</body>
+</html>

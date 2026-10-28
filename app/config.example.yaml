@@ -1,0 +1,54 @@
+# 公开仓用的配置模板（真实值只在 private 仓 / 本地 config.yaml）
+# 用法： cp config.example.yaml config.yaml  然后按本机改
+server:
+  host: 127.0.0.1
+  port: 8765
+
+llm:
+  backend: ollama
+  host: http://127.0.0.1:11434
+  model: digital-me-local        # ollama 里的模型名，替换成你自己的
+  api_style: ollama              # ollama(/api/chat + think:false) | openai(/v1 + reasoning_effort:none)
+  num_ctx: 4096
+  num_predict: 160
+  temperature: 0.6
+  top_p: 0.95
+  repeat_penalty: 1.25           # 1.1 压不住 20 轮复读
+  repeat_last_n: 512             # 默认 64 token 回看太短
+  inject_time_policy: on_demand  # 命中时间问句才注入时间；off=不注入
+  keep_alive: 30m
+  timeout_s: 60
+
+persona:
+  # 自己写的角色卡；public 仓只放 config/character.example.yaml
+  character_card: ../config/character.example.yaml
+  fallback_name: 桌宠
+  fallback_system: |
+    你是一个本地运行的数字分身。一到两句话说清，不用敬语，不寒暄，不知道就说不知道。
+    现在时间：{{runtime_now}}
+
+memory:
+  max_turns: 20                  # 一轮 = 2 条消息
+
+tts:
+  provider: auto                 # auto | gpt_sovits | macos_say | windows_sapi
+  gpt_sovits:
+    endpoint: http://127.0.0.1:9880
+    ref_audio: ./voice/ref.wav   # 5~8 秒参考音频，别用整段
+    ref_text: ""
+    text_lang: zh
+    prompt_lang: zh
+    timeout_s: 30
+  macos_say:
+    voice: Flo
+    rate: 200
+  windows_sapi:
+    voice: ""
+
+asr:
+  provider: none                 # none | http
+  http_endpoint: ""              # 例如 http://127.0.0.1:9000/asr
+  model_hint: sherpa-onnx
+
+logging:
+  latency_jsonl: logs/latency.jsonl

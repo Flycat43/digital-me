@@ -20,7 +20,9 @@
 | GPU | 不需要 | NVIDIA 6GB+ 显存（语音克隆速度差 10 倍以上） |
 | 系统 | macOS 12+ / Windows 10+ / Linux | 同左 |
 
-CPU 也能跑，语音会有 1-3 秒延迟；有独显时接近同步。
+CPU 也能跑。本机（Apple Silicon，Qwen3-4B Q4_K_M + GPT-SoVITS，4096 ctx）实测：
+首字 **P50 180 ms / P95 255 ms**，端到端首音 **P50 1.29 s / P95 2.06 s**（20 轮真实出声，见 `app/logs/latency.jsonl`）。
+有独显时语音克隆接近实时；CPU 上 TTS 是主要成本（RTF 实测 0.32–0.41）。
 
 ## 快速开始
 
