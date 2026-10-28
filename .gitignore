@@ -1,0 +1,36 @@
+# 模型与权重——永远不进仓库
+models/
+*.gguf
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+*.bin
+
+# 个人音色与语料
+voice/
+voice_ref/
+recordings/
+*.wav
+*.m4a
+*.mp3
+
+# 运行时数据
+data/
+logs/
+*.log
+cache/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 配置里的私人部分
+config/local.yaml
+config/character.yaml
+.env
+.env.local
+
+# 系统
+.DS_Store
+Thumbs.db
